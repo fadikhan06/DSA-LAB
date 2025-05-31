@@ -1,0 +1,9 @@
+
+
+ character count=32
+
+
+ sentence count=2
+
+
+ words count=7
