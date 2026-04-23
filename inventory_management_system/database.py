@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import base64
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -103,14 +103,14 @@ class DatabaseManager:
             if not admin_exists:
                 conn.execute(
                     "INSERT INTO users(username, password, role, created_at) VALUES(?,?,?,?)",
-                    ("admin", self._hash_password("admin123"), "admin", datetime.utcnow().isoformat()),
+                    ("admin", self._hash_password("admin123"), "admin", datetime.now(timezone.utc).isoformat()),
                 )
 
             shop_exists = conn.execute("SELECT id FROM shops LIMIT 1").fetchone()
             if not shop_exists:
                 conn.execute(
                     "INSERT INTO shops(name, location, created_at) VALUES(?,?,?)",
-                    ("Main Shop", "HQ", datetime.utcnow().isoformat()),
+                    ("Main Shop", "HQ", datetime.now(timezone.utc).isoformat()),
                 )
 
     def execute(self, query, params=()):
@@ -136,7 +136,7 @@ class DatabaseManager:
                 return existing["id"]
             cur = conn.execute(
                 "INSERT INTO shops(name, location, created_at) VALUES(?,?,?)",
-                (name.strip(), location.strip(), datetime.utcnow().isoformat()),
+                (name.strip(), location.strip(), datetime.now(timezone.utc).isoformat()),
             )
             return cur.lastrowid
 
@@ -180,7 +180,7 @@ class DatabaseManager:
         with self.connect() as conn:
             conn.execute(
                 "INSERT INTO users(username, password, role, created_at) VALUES(?,?,?,?)",
-                (username.strip(), self._hash_password(password), role, datetime.utcnow().isoformat()),
+                (username.strip(), self._hash_password(password), role, datetime.now(timezone.utc).isoformat()),
             )
 
     def get_categories(self, shop_id: int):
@@ -217,7 +217,7 @@ class DatabaseManager:
                     float(selling_price),
                     int(quantity),
                     int(low_stock_threshold),
-                    datetime.utcnow().isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
                 ),
             )
 
@@ -238,7 +238,7 @@ class DatabaseManager:
                     float(selling_price),
                     int(quantity),
                     int(low_stock_threshold),
-                    datetime.utcnow().isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
                     product_id,
                 ),
             )
@@ -300,7 +300,7 @@ class DatabaseManager:
         if not cart_items:
             raise ValueError("Cart is empty")
 
-        sold_at = datetime.utcnow().isoformat()
+        sold_at = datetime.now(timezone.utc).isoformat()
         with self.connect() as conn:
             total_amount = 0.0
             total_profit = 0.0
@@ -343,7 +343,7 @@ class DatabaseManager:
 
                 conn.execute(
                     "UPDATE products SET quantity = quantity - ?, updated_at=? WHERE id=?",
-                    (qty, datetime.utcnow().isoformat(), product["id"]),
+                    (qty, datetime.now(timezone.utc).isoformat(), product["id"]),
                 )
 
             return sale_id
@@ -394,7 +394,7 @@ class DatabaseManager:
         )
 
     def get_sales_report(self, shop_id: int, period: str):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if period == "daily":
             start = datetime(now.year, now.month, now.day)
         elif period == "weekly":

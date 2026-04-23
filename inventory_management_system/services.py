@@ -1,5 +1,5 @@
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import shutil
 
@@ -9,7 +9,7 @@ class ExportService:
     def export_report_csv(report: dict, output_dir: str = "exports") -> str:
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         out_file = out_dir / f"sales_report_{report['period']}_{ts}.csv"
 
         with out_file.open("w", newline="", encoding="utf-8") as f:
@@ -30,7 +30,7 @@ class ExportService:
     def export_report_pdf(report: dict, output_dir: str = "exports") -> str:
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         out_file = out_dir / f"sales_report_{report['period']}_{ts}.pdf"
 
         lines = [
@@ -94,7 +94,7 @@ class BackupService:
     def backup_database(db_path: str, backup_dir: str = "backups") -> str:
         out_dir = Path(backup_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         backup_file = out_dir / f"inventory_backup_{ts}.db"
         shutil.copy2(db_path, backup_file)
         return str(backup_file)
