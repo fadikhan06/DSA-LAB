@@ -1,4 +1,8 @@
 import sqlite3
+import os
+import hashlib
+import hmac
+import base64
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -99,7 +103,7 @@ class DatabaseManager:
             if not admin_exists:
                 conn.execute(
                     "INSERT INTO users(username, password, role, created_at) VALUES(?,?,?,?)",
-                    ("admin", "admin123", "admin", datetime.utcnow().isoformat()),
+                    ("admin", self._hash_password("admin123"), "admin", datetime.utcnow().isoformat()),
                 )
 
             shop_exists = conn.execute("SELECT id FROM shops LIMIT 1").fetchone()
@@ -136,17 +140,47 @@ class DatabaseManager:
             )
             return cur.lastrowid
 
+    @staticmethod
+    def _hash_password(password: str, salt: bytes | None = None) -> str:
+        salt = salt or os.urandom(16)
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200000)
+        return f"pbkdf2_sha256${base64.b64encode(salt).decode()}${base64.b64encode(digest).decode()}"
+
+    @staticmethod
+    def _verify_password(stored_password: str, provided_password: str) -> bool:
+        if not stored_password:
+            return False
+        if stored_password.startswith("pbkdf2_sha256$"):
+            try:
+                _, salt_b64, digest_b64 = stored_password.split("$", 2)
+                salt = base64.b64decode(salt_b64.encode())
+                expected = base64.b64decode(digest_b64.encode())
+                actual = hashlib.pbkdf2_hmac("sha256", provided_password.encode("utf-8"), salt, 200000)
+                return hmac.compare_digest(actual, expected)
+            except Exception:
+                return False
+        return hmac.compare_digest(stored_password, provided_password)
+
     def get_user(self, username: str, password: str):
-        return self.fetchone(
-            "SELECT * FROM users WHERE username=? AND password=?",
-            (username.strip(), password),
-        )
+        user = self.fetchone("SELECT * FROM users WHERE username=?", (username.strip(),))
+        if not user:
+            return None
+        if self._verify_password(user["password"], password):
+            if not str(user["password"]).startswith("pbkdf2_sha256$"):
+                with self.connect() as conn:
+                    conn.execute(
+                        "UPDATE users SET password=? WHERE id=?",
+                        (self._hash_password(password), user["id"]),
+                    )
+                user = self.fetchone("SELECT * FROM users WHERE id=?", (user["id"],))
+            return user
+        return None
 
     def create_user(self, username: str, password: str, role: str):
         with self.connect() as conn:
             conn.execute(
                 "INSERT INTO users(username, password, role, created_at) VALUES(?,?,?,?)",
-                (username.strip(), password, role, datetime.utcnow().isoformat()),
+                (username.strip(), self._hash_password(password), role, datetime.utcnow().isoformat()),
             )
 
     def get_categories(self, shop_id: int):
@@ -249,6 +283,13 @@ class DatabaseManager:
             (shop_id, barcode.strip()),
         )
 
+    def get_products_map(self, product_ids: list[int]):
+        if not product_ids:
+            return {}
+        placeholders = ",".join("?" for _ in product_ids)
+        rows = self.fetchall(f"SELECT * FROM products WHERE id IN ({placeholders})", tuple(product_ids))
+        return {row["id"]: row for row in rows}
+
     def get_low_stock_products(self, shop_id: int):
         return self.fetchall(
             "SELECT * FROM products WHERE shop_id=? AND quantity <= low_stock_threshold ORDER BY quantity ASC",
@@ -263,6 +304,7 @@ class DatabaseManager:
         with self.connect() as conn:
             total_amount = 0.0
             total_profit = 0.0
+            validated_products = {}
 
             for item in cart_items:
                 product = conn.execute("SELECT * FROM products WHERE id=?", (item["product_id"],)).fetchone()
@@ -270,6 +312,7 @@ class DatabaseManager:
                     raise ValueError(f"Product ID {item['product_id']} not found")
                 if product["quantity"] < item["quantity"]:
                     raise ValueError(f"Insufficient stock for {product['name']}")
+                validated_products[item["product_id"]] = product
 
                 line_total = float(product["selling_price"]) * int(item["quantity"])
                 line_profit = (float(product["selling_price"]) - float(product["purchase_price"])) * int(item["quantity"])
@@ -283,7 +326,7 @@ class DatabaseManager:
             sale_id = sale_cur.lastrowid
 
             for item in cart_items:
-                product = conn.execute("SELECT * FROM products WHERE id=?", (item["product_id"],)).fetchone()
+                product = validated_products[item["product_id"]]
                 qty = int(item["quantity"])
                 unit_price = float(product["selling_price"])
                 unit_cost = float(product["purchase_price"])
@@ -344,7 +387,7 @@ class DatabaseManager:
             """
             SELECT id, total_amount, total_profit, sold_at
             FROM sales
-            WHERE shop_id=? AND sold_at >= ? AND sold_at < ?
+            WHERE shop_id=? AND sold_at >= ? AND sold_at <= ?
             ORDER BY sold_at DESC
             """,
             (shop_id, start.isoformat(), end.isoformat()),
@@ -360,7 +403,7 @@ class DatabaseManager:
             start = now - timedelta(days=30)
         else:
             raise ValueError("Invalid period")
-        sales = self._sales_between(shop_id, start, now + timedelta(seconds=1))
+        sales = self._sales_between(shop_id, start, now)
         revenue = sum(float(r["total_amount"]) for r in sales)
         profit = sum(float(r["total_profit"]) for r in sales)
         return {

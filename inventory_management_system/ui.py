@@ -315,6 +315,7 @@ class InventoryApp(tk.Tk):
 
         names = [c["name"] for c in categories]
         self.prod_category["values"] = names
+        self.category_id_by_name = {c["name"]: c["id"] for c in categories}
 
     def refresh_products(self):
         query = self.product_search.get().strip() if hasattr(self, "product_search") else ""
@@ -344,11 +345,7 @@ class InventoryApp(tk.Tk):
         cat_name = self.prod_category.get().strip()
         if not cat_name:
             return None
-        categories = self.db.get_categories(self.shop_id)
-        for c in categories:
-            if c["name"] == cat_name:
-                return c["id"]
-        return None
+        return self.category_id_by_name.get(cat_name)
 
     def add_category(self):
         if self.user["role"] != "admin":
@@ -500,8 +497,11 @@ class InventoryApp(tk.Tk):
         for i in self.cart_tree.get_children():
             self.cart_tree.delete(i)
         total = 0.0
+        products = self.db.get_products_map([c["product_id"] for c in self.cart_items])
         for c in self.cart_items:
-            p = self.db.get_product_by_id(c["product_id"])
+            p = products.get(c["product_id"])
+            if not p:
+                continue
             line = float(p["selling_price"]) * int(c["quantity"])
             total += line
             self.cart_tree.insert("", "end", values=(p["id"], p["name"], c["quantity"], f"{p['selling_price']:.2f}", f"{line:.2f}"))
@@ -514,7 +514,7 @@ class InventoryApp(tk.Tk):
         try:
             sale_id = self.db.create_sale(self.shop_id, int(self.user["id"]), self.cart_items)
             sale, items = self.db.get_sale(sale_id)
-            receipt_file = ReceiptService.create_receipt(sale, items)
+            receipt_file = ReceiptService.create_receipt(sale, items, "inventory_management_system/receipts")
             self.notify(f"Sale #{sale_id} complete. Receipt: {receipt_file}")
             self.cart_items = []
             self.refresh_cart_view()

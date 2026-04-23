@@ -46,7 +46,7 @@ class ExportService:
         for row in report["sales"][:60]:
             lines.append(f"{row['id']}  {row['total_amount']:.2f}  {row['total_profit']:.2f}  {row['sold_at']}")
 
-        text = "\\n".join(lines).replace("(", "[").replace(")", "]")
+        text = "\n".join(lines).replace("(", "[").replace(")", "]")
         stream = f"BT /F1 11 Tf 50 780 Td ({text}) Tj ET"
         pdf_bytes = (
             b"%PDF-1.4\n"
