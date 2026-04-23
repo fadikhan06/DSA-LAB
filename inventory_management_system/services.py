@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 import shutil
 
+MAX_PDF_SALES_ROWS = 60
+
 
 class ExportService:
     @staticmethod
@@ -43,11 +45,21 @@ class ExportService:
             "",
             "SaleID  Revenue  Profit  SoldAt",
         ]
-        for row in report["sales"][:60]:
+        for row in report["sales"][:MAX_PDF_SALES_ROWS]:
             lines.append(f"{row['id']}  {row['total_amount']:.2f}  {row['total_profit']:.2f}  {row['sold_at']}")
 
-        text = "\n".join(lines).replace("(", "[").replace(")", "]")
-        stream = f"BT /F1 11 Tf 50 780 Td ({text}) Tj ET"
+        def _pdf_escape(value: str) -> str:
+            return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+        stream_lines = ["BT /F1 11 Tf 50 800 Td"]
+        for i, line in enumerate(lines):
+            escaped = _pdf_escape(line)
+            if i == 0:
+                stream_lines.append(f"({escaped}) Tj")
+            else:
+                stream_lines.append(f"0 -14 Td ({escaped}) Tj")
+        stream_lines.append("ET")
+        stream = "\n".join(stream_lines)
         pdf_bytes = (
             b"%PDF-1.4\n"
             b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"

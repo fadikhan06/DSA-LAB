@@ -396,7 +396,7 @@ class DatabaseManager:
     def get_sales_report(self, shop_id: int, period: str):
         now = datetime.now(timezone.utc)
         if period == "daily":
-            start = datetime(now.year, now.month, now.day)
+            start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
         elif period == "weekly":
             start = now - timedelta(days=7)
         elif period == "monthly":
