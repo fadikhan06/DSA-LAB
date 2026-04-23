@@ -30,6 +30,7 @@ class ExportService:
 
     @staticmethod
     def export_report_pdf(report: dict, output_dir: str = "exports") -> str:
+        """Export report to PDF (shows up to MAX_PDF_SALES_ROWS detailed sale rows)."""
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -47,6 +48,11 @@ class ExportService:
         ]
         for row in report["sales"][:MAX_PDF_SALES_ROWS]:
             lines.append(f"{row['id']}  {row['total_amount']:.2f}  {row['total_profit']:.2f}  {row['sold_at']}")
+        if len(report["sales"]) > MAX_PDF_SALES_ROWS:
+            lines.append("")
+            lines.append(
+                f"Note: Showing first {MAX_PDF_SALES_ROWS} of {len(report['sales'])} sales rows in PDF."
+            )
 
         def _pdf_escape(value: str) -> str:
             return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
