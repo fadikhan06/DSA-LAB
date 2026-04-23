@@ -53,9 +53,8 @@ A production-oriented desktop Inventory Management System for a retail shop with
 
 ## Setup Instructions
 1. Ensure Python 3.10+ is installed.
-2. From repository root, run:
+2. Navigate to the repository root, then run:
    ```bash
-   cd /home/runner/work/DSA-LAB/DSA-LAB
    python3 inventory_management_system/app.py
    ```
 3. Login using default credentials:
