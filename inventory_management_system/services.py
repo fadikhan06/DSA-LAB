@@ -72,7 +72,7 @@ class ExportService:
             b"2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n"
             b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n"
             b"4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n"
-            + f"5 0 obj<</Length {len(stream)}>>stream\n{stream}\nendstream endobj\n".encode("latin-1", "ignore")
+            + f"5 0 obj<</Length {len(stream)}>>stream\n{stream}\nendstream endobj\n".encode("latin-1", "replace")
             + b"xref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000241 00000 n \n0000000311 00000 n \ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n"
             + str(311 + len(stream)).encode()
             + b"\n%%EOF"

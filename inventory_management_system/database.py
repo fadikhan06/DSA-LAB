@@ -286,8 +286,14 @@ class DatabaseManager:
     def get_products_map(self, product_ids: list[int]):
         if not product_ids:
             return {}
-        placeholders = ",".join("?" for _ in product_ids)
-        rows = self.fetchall(f"SELECT * FROM products WHERE id IN ({placeholders})", tuple(product_ids))
+        sanitized_ids = []
+        for pid in product_ids:
+            try:
+                sanitized_ids.append(int(pid))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Product IDs must be integers") from exc
+        placeholders = ",".join("?" for _ in sanitized_ids)
+        rows = self.fetchall(f"SELECT * FROM products WHERE id IN ({placeholders})", tuple(sanitized_ids))
         return {row["id"]: row for row in rows}
 
     def get_low_stock_products(self, shop_id: int):
@@ -387,7 +393,7 @@ class DatabaseManager:
             """
             SELECT id, total_amount, total_profit, sold_at
             FROM sales
-            WHERE shop_id=? AND sold_at >= ? AND sold_at <= ?
+            WHERE shop_id=? AND sold_at >= ? AND sold_at < ?
             ORDER BY sold_at DESC
             """,
             (shop_id, start.isoformat(), end.isoformat()),
@@ -397,19 +403,22 @@ class DatabaseManager:
         now = datetime.now(timezone.utc)
         if period == "daily":
             start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+            end = start + timedelta(days=1)
         elif period == "weekly":
             start = now - timedelta(days=7)
+            end = now
         elif period == "monthly":
             start = now - timedelta(days=30)
+            end = now
         else:
             raise ValueError("Invalid period")
-        sales = self._sales_between(shop_id, start, now)
+        sales = self._sales_between(shop_id, start, end)
         revenue = sum(float(r["total_amount"]) for r in sales)
         profit = sum(float(r["total_profit"]) for r in sales)
         return {
             "period": period,
             "start": start,
-            "end": now,
+            "end": end,
             "count": len(sales),
             "revenue": revenue,
             "profit": profit,

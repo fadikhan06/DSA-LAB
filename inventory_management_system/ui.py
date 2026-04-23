@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+from pathlib import Path
 
 from database import DatabaseManager
 from services import ExportService, ReceiptService, BackupService
@@ -12,7 +13,8 @@ class InventoryApp(tk.Tk):
         self.geometry("1280x760")
         self.minsize(1100, 700)
 
-        self.db = DatabaseManager("inventory_management_system/inventory.db")
+        self.base_dir = Path(__file__).resolve().parent
+        self.db = DatabaseManager(str(self.base_dir / "inventory.db"))
         self.user = None
         self.shop_id = None
         self.dark_mode = False
@@ -73,7 +75,6 @@ class InventoryApp(tk.Tk):
         self.shop_combo.grid(row=3, column=1, pady=8)
 
         ttk.Button(card, text="Login", command=self.login).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(12, 4))
-        tk.Label(card, text="Default admin: admin / admin123", bg=self.theme["panel"], fg="#6C757D").grid(row=5, column=0, columnspan=2)
 
     def login(self):
         username = self.username_entry.get().strip()
@@ -514,7 +515,7 @@ class InventoryApp(tk.Tk):
         try:
             sale_id = self.db.create_sale(self.shop_id, int(self.user["id"]), self.cart_items)
             sale, items = self.db.get_sale(sale_id)
-            receipt_file = ReceiptService.create_receipt(sale, items, "inventory_management_system/receipts")
+            receipt_file = ReceiptService.create_receipt(sale, items, str(self.base_dir / "receipts"))
             self.notify(f"Sale #{sale_id} complete. Receipt: {receipt_file}")
             self.cart_items = []
             self.refresh_cart_view()
@@ -552,7 +553,7 @@ class InventoryApp(tk.Tk):
         if not self.current_report:
             return
         try:
-            file = ExportService.export_report_csv(self.current_report, "inventory_management_system/exports")
+            file = ExportService.export_report_csv(self.current_report, str(self.base_dir / "exports"))
             self.notify(f"CSV exported: {file}")
             messagebox.showinfo("Export", f"CSV exported to:\n{file}")
         except Exception as e:
@@ -564,7 +565,7 @@ class InventoryApp(tk.Tk):
         if not self.current_report:
             return
         try:
-            file = ExportService.export_report_pdf(self.current_report, "inventory_management_system/exports")
+            file = ExportService.export_report_pdf(self.current_report, str(self.base_dir / "exports"))
             self.notify(f"PDF exported: {file}")
             messagebox.showinfo("Export", f"PDF exported to:\n{file}")
         except Exception as e:
@@ -572,7 +573,7 @@ class InventoryApp(tk.Tk):
 
     def backup_db(self):
         try:
-            file = BackupService.backup_database("inventory_management_system/inventory.db", "inventory_management_system/backups")
+            file = BackupService.backup_database(str(self.base_dir / "inventory.db"), str(self.base_dir / "backups"))
             self.notify(f"Backup created: {file}")
             messagebox.showinfo("Backup", f"Backup saved to:\n{file}")
         except Exception as e:
@@ -585,7 +586,7 @@ class InventoryApp(tk.Tk):
         if not messagebox.askyesno("Restore", "Restoring will overwrite current database. Continue?"):
             return
         try:
-            BackupService.restore_database(backup_file, "inventory_management_system/inventory.db")
+            BackupService.restore_database(backup_file, str(self.base_dir / "inventory.db"))
             self.notify("Database restored successfully")
             self.refresh_all()
             messagebox.showinfo("Restore", "Database restored successfully")
